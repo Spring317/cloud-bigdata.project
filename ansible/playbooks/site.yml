@@ -1,0 +1,76 @@
+---
+- name: Setup Common Components
+  hosts: spark_cluster
+  become: true
+  vars:
+    spark_version: "2.4.3"
+    hadoop_version: "2.7"
+    spark_home: "/opt/spark"
+    java_home: "/usr/lib/jvm/jdk1.8.0_202"
+    master_private_ip: "{{ hostvars[groups['master'][0]]['private_ip'] }}"
+  roles:
+    - role: ../roles/common
+  
+  tasks:
+    - name: Update /etc/hosts
+      template:
+        src: ../roles/spark/templates/hosts.j2
+        dest: /etc/hosts
+        backup: yes
+
+    - name: Disable SSH password authentication
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PasswordAuthentication'
+        line: 'PasswordAuthentication no'
+        state: present
+      notify: restart sshd
+    
+    - name: Disable root login
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PermitRootLogin'
+        line: 'PermitRootLogin no'
+        state: present
+      notify: restart sshd
+  
+  handlers:
+    - name: restart sshd
+      systemd:
+        name: sshd
+        state: restarted
+
+- name: Setup Spark Master
+  hosts: master
+  become: true
+  vars:
+    spark_version: "2.4.3"
+    spark_home: "/opt/spark"
+    master_private_ip: "{{ hostvars[groups['master'][0]]['private_ip'] }}"
+  roles:
+    - role: ../roles/spark
+      spark_role: master
+
+- name: Setup Spark Workers
+  hosts: workers
+  become: true
+  vars:
+    spark_version: "2.4.3"
+    spark_home: "/opt/spark"
+    master_private_ip: "{{ hostvars[groups['master'][0]]['private_ip'] }}"
+    master_url: "spark://{{ master_private_ip }}:7077"
+  roles:
+    - role: ../roles/spark
+      spark_role: worker
+
+- name: Setup Spark Client/Edge
+  hosts: edge
+  become: true
+  vars:
+    spark_version: "2.4.3"
+    spark_home: "/opt/spark"
+    master_private_ip: "{{ hostvars[groups['master'][0]]['private_ip'] }}"
+    master_url: "spark://{{ master_private_ip }}:7077"
+  roles:
+    - role: ../roles/spark
+      spark_role: client

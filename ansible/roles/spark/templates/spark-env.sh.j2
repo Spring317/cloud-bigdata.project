@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+export JAVA_HOME={{ java_home | default('/usr/lib/jvm/jdk1.8.0_202') }}
+export SPARK_HOME={{ spark_home | default('/opt/spark') }}
+export PATH=$SPARK_HOME/bin:$SPARK_HOME/sbin:$PATH
+
+{% if spark_role == 'master' %}
+export SPARK_MASTER_HOST={{ ansible_default_ipv4.address }}
+{% endif %}

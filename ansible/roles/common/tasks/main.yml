@@ -1,0 +1,175 @@
+---
+- name: Update apt cache
+  apt:
+    update_cache: yes
+
+- name: Install common packages
+  apt:
+    name:
+      - python3
+      - python3-pip
+      - unzip
+      - curl
+      - wget
+    state: present
+    update_cache: yes
+
+- name: Ensure sparkuser exists
+  user:
+    name: "{{ lookup('env','USER') if ssh_user is not defined else ssh_user }}"
+    state: present
+    create_home: yes
+
+- name: Create /opt/java directory
+  file:
+    path: /opt/java
+    state: directory
+    mode: '0755'
+
+- name: Download JDK 1.8.0_202
+  get_url:
+    url: "https://javadl.oracle.com/webapps/download/GetFile/1.8.0_202-b08/1961070e4c9b4e26a04e7f5a083f551e/linux-i586/jdk-8u202-linux-x64.tar.gz"
+    dest: /tmp/jdk-8u202-linux-x64.tar.gz
+    mode: '0644'
+    timeout: 300
+  register: jdk_download
+  ignore_errors: yes
+
+- name: Download JDK 1.8.0_202 from alternative source
+  get_url:
+    url: "https://github.com/frekele/oracle-java/releases/download/8u202-b08/jdk-8u202-linux-x64.tar.gz"
+    dest: /tmp/jdk-8u202-linux-x64.tar.gz
+    mode: '0644'
+    timeout: 300
+  when: jdk_download.failed
+
+- name: Check if JDK tarball was downloaded
+  stat:
+    path: /tmp/jdk-8u202-linux-x64.tar.gz
+  register: jdk_tarball
+
+- name: Fail if JDK tarball not found
+  fail:
+    msg: "JDK tarball was not downloaded. Please check your internet connection or try a different source."
+  when: not jdk_tarball.stat.exists
+
+- name: Extract JDK 1.8.0_202
+  unarchive:
+    src: /tmp/jdk-8u202-linux-x64.tar.gz
+    dest: /opt/java
+    remote_src: yes
+    creates: /opt/java/jdk1.8.0_202
+
+- name: List /opt/java contents
+  command: ls -la /opt/java
+  register: java_contents
+  changed_when: false
+
+- name: Show /opt/java contents
+  debug:
+    var: java_contents.stdout_lines
+
+- name: Verify JDK extraction
+  stat:
+    path: /opt/java/jdk1.8.0_202
+  register: jdk_dir
+
+- name: Create /usr/lib/jvm directory
+  file:
+    path: /usr/lib/jvm
+    state: directory
+    mode: '0755'
+
+- name: Create JDK symlink
+  file:
+    src: /opt/java/jdk1.8.0_202
+    dest: /usr/lib/jvm/jdk1.8.0_202
+    state: link
+    force: yes
+  when: jdk_dir.stat.exists
+
+- name: Set JAVA_HOME in /etc/environment
+  lineinfile:
+    path: /etc/environment
+    line: 'JAVA_HOME="/usr/lib/jvm/jdk1.8.0_202"'
+    create: yes
+
+- name: Update alternatives for java
+  command: update-alternatives --install /usr/bin/java java /usr/lib/jvm/jdk1.8.0_202/bin/java 1
+  args:
+    creates: /usr/bin/java
+
+- name: Set java alternative
+  command: update-alternatives --set java /usr/lib/jvm/jdk1.8.0_202/bin/java
+  ignore_errors: yes
+
+- name: Update alternatives for javac
+  command: update-alternatives --install /usr/bin/javac javac /usr/lib/jvm/jdk1.8.0_202/bin/javac 1
+  args:
+    creates: /usr/bin/javac
+
+- name: Set javac alternative
+  command: update-alternatives --set javac /usr/lib/jvm/jdk1.8.0_202/bin/javac
+  ignore_errors: yes
+
+- name: Create spark user
+  user:
+    name: spark
+    system: yes
+    shell: /bin/bash
+    home: /home/spark
+    create_home: yes
+
+- name: Create Spark directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: spark
+    group: spark
+    mode: '0755'
+  loop:
+    - /opt/spark
+    - /opt/spark/logs
+    - /opt/spark/work
+    - /opt/spark/tmp
+    - /opt/spark/conf
+
+- name: Download and extract Spark
+  unarchive:
+    src: "https://archive.apache.org/dist/spark/spark-2.4.3/spark-2.4.3-bin-hadoop2.7.tgz"
+    dest: /tmp
+    remote_src: yes
+    creates: "/tmp/spark-2.4.3-bin-hadoop2.7"
+
+- name: Copy Spark files to /opt/spark
+  shell: |
+    cp -r /tmp/spark-2.4.3-bin-hadoop2.7/* /opt/spark/
+    chown -R spark:spark /opt/spark
+  args:
+    creates: /opt/spark/bin/spark-submit
+
+- include_tasks: "{{ spark_role }}.yml"
+  when: spark_role is defined
+
+- name: Create WordCount example
+  template:
+    src: WordCount.java.j2
+    dest: /opt/spark/WordCount.java
+    owner: spark
+    group: spark
+    mode: '0644'
+  when: spark_role is defined and spark_role == "client"
+
+- name: Create sample text file
+  copy:
+    content: |
+      Hello Spark World
+      Apache Spark is a unified analytics engine
+      for large-scale data processing
+      Spark provides high-level APIs in Java Scala Python and R
+      Word count is a classic example in big data processing
+    dest: /opt/spark/sample.txt
+    owner: spark
+    group: spark
+    mode: '0644'
+  when: spark_role is defined and spark_role == "client"

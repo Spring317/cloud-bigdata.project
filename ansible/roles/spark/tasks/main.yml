@@ -1,0 +1,91 @@
+- name: Ensure /opt/spark/conf directory exists
+  file:
+    path: /opt/spark/conf
+    state: directory
+    owner: spark
+    group: spark
+    mode: '0755'
+
+- name: Place spark-env.sh
+  template:
+    src: spark-env.sh.j2
+    dest: /opt/spark/conf/spark-env.sh
+    mode: '0755'
+    owner: spark
+    group: spark
+
+- name: Place spark-defaults.conf
+  template:
+    src: spark-defaults.conf.j2
+    dest: /opt/spark/conf/spark-defaults.conf
+    owner: spark
+    group: spark
+    mode: '0644'
+
+- name: Create systemd unit for spark-master
+  copy:
+    dest: /etc/systemd/system/spark-master.service
+    content: |
+      [Unit]
+      Description=Spark Master
+      After=network.target
+
+      [Service]
+      Type=forking
+      User=spark
+      Environment="JAVA_HOME=/usr/lib/jvm/jdk1.8.0_202"
+      Environment="SPARK_HOME=/opt/spark"
+      ExecStart=/opt/spark/sbin/start-master.sh
+      ExecStop=/opt/spark/sbin/stop-master.sh
+      Restart=on-failure
+      RestartSec=10
+
+      [Install]
+      WantedBy=multi-user.target
+  when: spark_role == 'master'
+
+- name: Create systemd template for spark-worker
+  copy:
+    dest: /etc/systemd/system/spark-worker@.service
+    content: |
+      [Unit]
+      Description=Spark Worker %i
+      After=network.target
+
+      [Service]
+      Type=forking
+      User=spark
+      Environment="JAVA_HOME=/usr/lib/jvm/jdk1.8.0_202"
+      Environment="SPARK_HOME=/opt/spark"
+      ExecStart=/opt/spark/sbin/start-slave.sh {{ master_url }}
+      ExecStop=/opt/spark/sbin/stop-slave.sh
+      Restart=on-failure
+      RestartSec=10
+
+      [Install]
+      WantedBy=multi-user.target
+  when: spark_role == 'worker'
+
+- name: Reload systemd
+  systemd:
+    daemon_reload: yes
+
+- name: Enable and start spark-master
+  systemd:
+    name: spark-master.service
+    enabled: yes
+    state: started
+  when: spark_role == 'master'
+
+- name: Enable and start spark-worker instances
+  systemd:
+    name: "spark-worker@1.service"
+    enabled: yes
+    state: started
+  when: spark_role == 'worker'
+
+- name: Update /etc/hosts with cluster nodes
+  template:
+    src: hosts.j2
+    dest: /etc/hosts
+    backup: yes

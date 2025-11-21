@@ -1,0 +1,28 @@
+# Spark Application Properties
+spark.app.name                 SparkCluster
+spark.master                   {% if spark_role == 'master' %}local[*]{% else %}spark://{{ master_private_ip }}:7077{% endif %}
+
+# Spark SQL Properties
+spark.sql.warehouse.dir        {{ spark_home }}/warehouse
+spark.sql.adaptive.enabled     true
+spark.sql.adaptive.coalescePartitions.enabled    true
+
+# Spark History Server
+spark.eventLog.enabled         true
+spark.eventLog.dir             {{ spark_home }}/logs
+spark.history.fs.logDirectory  {{ spark_home }}/logs
+
+# Memory Management
+spark.executor.memory          1g
+spark.driver.memory            1g
+spark.executor.cores           1
+spark.driver.cores             1
+
+# Network
+spark.driver.host              {{ ansible_default_ipv4.address }}
+{% if spark_role == 'master' %}
+spark.driver.bindAddress       {{ ansible_default_ipv4.address }}
+{% endif %}
+
+# Serialization
+spark.serializer               org.apache.spark.serializer.KryoSerializer
