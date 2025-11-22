@@ -56,3 +56,13 @@ output "edge_public_ip" {
   value       = google_compute_instance.edge.network_interface[0].access_config[0].nat_ip
   description = "Edge node public IP address"
 }
+
+output "gcs_bucket" {
+  value       = google_storage_bucket.spark_data.name
+  description = "GCS bucket name for Spark data"
+}
+
+output "gcs_bucket_url" {
+  value       = "gs://${google_storage_bucket.spark_data.name}"
+  description = "GCS bucket URL for Spark data"
+}

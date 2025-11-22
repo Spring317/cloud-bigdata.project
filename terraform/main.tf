@@ -182,3 +182,40 @@ resource "google_project_iam_member" "spark_logging" {
   role    = "roles/logging.logWriter"
   member  = "serviceAccount:${google_service_account.spark_worker.email}"
 }
+
+# Create GCS bucket for Spark data
+resource "google_storage_bucket" "spark_data" {
+  name          = "${var.project}-spark-data"
+  location      = var.region
+  force_destroy = true
+
+  uniform_bucket_level_access = true
+
+  lifecycle_rule {
+    condition {
+      age = 30
+    }
+    action {
+      type = "Delete"
+    }
+  }
+}
+
+# Grant GCS access to service accounts
+resource "google_storage_bucket_iam_member" "spark_master_storage" {
+  bucket = google_storage_bucket.spark_data.name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.spark_master.email}"
+}
+
+resource "google_storage_bucket_iam_member" "spark_worker_storage" {
+  bucket = google_storage_bucket.spark_data.name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.spark_worker.email}"
+}
+
+resource "google_storage_bucket_iam_member" "spark_edge_storage" {
+  bucket = google_storage_bucket.spark_data.name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.spark_edge.email}"
+}
