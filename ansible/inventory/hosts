@@ -1,12 +1,12 @@
 [master]
-master ansible_host=34.61.228.226 private_ip=10.128.0.2 ansible_user=ubuntu
+master ansible_host=35.222.73.137 private_ip=10.128.0.5 ansible_user=ubuntu
 
 [workers]
-worker-1 ansible_host=34.58.203.94 private_ip=10.128.0.3 ansible_user=ubuntu
-worker-2 ansible_host=34.133.150.19 private_ip=10.128.0.5 ansible_user=ubuntu
+worker-1 ansible_host=136.112.234.105 private_ip=10.128.0.2 ansible_user=ubuntu
+worker-2 ansible_host=35.238.187.33 private_ip=10.128.0.3 ansible_user=ubuntu
 
 [edge]
-edge ansible_host=34.134.143.6 private_ip=10.128.0.4 ansible_user=ubuntu
+edge ansible_host=35.188.180.34 private_ip=10.128.0.4 ansible_user=ubuntu
 
 [spark_cluster:children]
 master

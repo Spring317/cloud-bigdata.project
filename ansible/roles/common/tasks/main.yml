@@ -26,32 +26,51 @@
     state: directory
     mode: '0755'
 
-- name: Download JDK 1.8.0_202
-  get_url:
-    url: "https://javadl.oracle.com/webapps/download/GetFile/1.8.0_202-b08/1961070e4c9b4e26a04e7f5a083f551e/linux-i586/jdk-8u202-linux-x64.tar.gz"
-    dest: /tmp/jdk-8u202-linux-x64.tar.gz
-    mode: '0644'
-    timeout: 300
-  register: jdk_download
-  ignore_errors: yes
+- name: Remove old/corrupted JDK tarball if exists
+  file:
+    path: /tmp/jdk-8u202-linux-x64.tar.gz
+    state: absent
 
-- name: Download JDK 1.8.0_202 from alternative source
+- name: Download JDK 1.8.0_202 from GitHub mirror
   get_url:
     url: "https://github.com/frekele/oracle-java/releases/download/8u202-b08/jdk-8u202-linux-x64.tar.gz"
     dest: /tmp/jdk-8u202-linux-x64.tar.gz
     mode: '0644'
-    timeout: 300
-  when: jdk_download.failed
+    timeout: 600
+    force: yes
+    checksum: "sha256:9a5c32411a6a06e22b69c495b7975034409fa1652d03aeb8eb5b6f59fd4594e0"
+  register: jdk_download
 
-- name: Check if JDK tarball was downloaded
+- name: Verify JDK tarball integrity
   stat:
     path: /tmp/jdk-8u202-linux-x64.tar.gz
   register: jdk_tarball
 
-- name: Fail if JDK tarball not found
+- name: Check JDK tarball is not empty
   fail:
-    msg: "JDK tarball was not downloaded. Please check your internet connection or try a different source."
-  when: not jdk_tarball.stat.exists
+    msg: "JDK tarball is empty or too small (< 100MB). Download may have failed."
+  when: jdk_tarball.stat.exists and jdk_tarball.stat.size < 100000000
+
+- name: Verify tarball is valid gzip
+  command: gzip -t /tmp/jdk-8u202-linux-x64.tar.gz
+  register: gzip_test
+  changed_when: false
+  failed_when: false
+
+- name: Remove corrupted tarball if gzip test failed
+  file:
+    path: /tmp/jdk-8u202-linux-x64.tar.gz
+    state: absent
+  when: gzip_test.rc != 0
+
+- name: Re-download JDK if corrupted
+  get_url:
+    url: "https://github.com/frekele/oracle-java/releases/download/8u202-b08/jdk-8u202-linux-x64.tar.gz"
+    dest: /tmp/jdk-8u202-linux-x64.tar.gz
+    mode: '0644'
+    timeout: 600
+    force: yes
+  when: gzip_test.rc != 0
 
 - name: Extract JDK 1.8.0_202
   unarchive:
@@ -147,6 +166,27 @@
     chown -R spark:spark /opt/spark
   args:
     creates: /opt/spark/bin/spark-submit
+
+- name: Download GCS connector for Spark
+  get_url:
+    url: "https://storage.googleapis.com/hadoop-lib/gcs/gcs-connector-hadoop2-2.0.1.jar"
+    dest: /opt/spark/jars/gcs-connector-hadoop2-2.0.1.jar
+    mode: '0644'
+    timeout: 300
+
+- name: Configure Spark to use GCS
+  blockinfile:
+    path: /opt/spark/conf/spark-defaults.conf
+    create: yes
+    owner: spark
+    group: spark
+    mode: '0644'
+    block: |
+      # Google Cloud Storage Configuration
+      spark.hadoop.fs.gs.impl=com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem
+      spark.hadoop.fs.AbstractFileSystem.gs.impl=com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS
+      spark.hadoop.google.cloud.auth.service.account.enable=true
+      spark.hadoop.fs.gs.project.id={{ lookup('env', 'TF_VAR_project') | default('spark-automation-1763590375') }}
 
 - include_tasks: "{{ spark_role }}.yml"
   when: spark_role is defined
