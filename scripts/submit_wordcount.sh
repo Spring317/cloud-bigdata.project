@@ -2,11 +2,11 @@
 set -e
 
 # Configuration
-EDGE_IP="34.134.143.6"
-MASTER_IP="34.61.228.226"
-WORKER1_IP="34.58.203.94"
-WORKER2_IP="34.133.150.19"
-PROJECT_ROOT="$ROOT_DIR/cloud-bigdata.project"
+EDGE_IP="35.188.180.34"
+MASTER_IP="35.222.73.137"
+WORKER1_IP="136.112.234.105"
+WORKER2_IP="35.238.187.33"
+PROJECT_ROOT="$HOME/cloud-bigdata.project"
 SSH_USER="ubuntu"
 INPUT_FILE="large_sample.txt"
 
@@ -83,7 +83,7 @@ ssh -o StrictHostKeyChecking=no ${SSH_USER}@$EDGE_IP << 'ENDSSH'
     echo 'Submitting WordCount job...'
     time /opt/spark/bin/spark-submit \
         --class org.apache.spark.examples.JavaWordCount \
-        --master spark://10.128.0.2:7077 \
+        --master spark://10.128.0.5:7077\
         --executor-memory 2g \
         --total-executor-cores 4 \
         --conf spark.eventLog.enabled=false \
