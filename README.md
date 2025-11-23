@@ -1,18 +1,19 @@
-## Getting Started
+# Automation of Spark Deployment with Ansible and Terraform on Google Cloud Service 
 
-Welcome to the VS Code Java world. Here is a guideline to help you get started to write Java code in Visual Studio Code.
+This document explains how to deploy the Spark cluster using Terraform and Ansible.
 
-## Folder Structure
+Prerequisites
+- gcloud CLI configured and authenticated
+- Terraform installed (>= 0.12)
+- Ansible installed (>= 2.9)
+- jq installed (used by scripts)
 
-The workspace contains two folders by default, where:
+Steps
+1. Edit `terraform/variables.tf` or pass variables via environment `TF_VAR_project`, `TF_VAR_ssh_username`, etc.
+2. Ensure `TF_VAR_ssh_public_key` points to your public key (default `~/.ssh/id_rsa.pub`).
+3. Run deployment (this will apply infrastructure, configure nodes, upload data to storage and perform WordCount task):
 
-- `src`: the folder to maintain sources
-- `lib`: the folder to maintain dependencies
+```bash
+./scripts/deploy.sh
+```
 
-Meanwhile, the compiled output files will be generated in the `bin` folder by default.
-
-> If you want to customize the folder structure, open `.vscode/settings.json` and update the related settings there.
-
-## Dependency Management
-
-The `JAVA PROJECTS` view allows you to manage your dependencies. More details can be found [here](https://github.com/microsoft/vscode-java-dependency#manage-dependencies).
